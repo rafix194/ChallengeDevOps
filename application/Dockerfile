@@ -1,25 +1,14 @@
-FROM ubuntu:22.04 as builder
-
-RUN apt-get update && \
-    apt-get install -y \
-        apache2 \
-        php \
-        php-cli \
-        php-mysql \
-        mysql-server \
-        composer \
-        git && \
-
-# Config Apache        
+FROM base:v1 as builder
+        
 COPY laravel.conf /etc/apache2/sites-available/laravel.conf
 
 RUN a2ensite laravel.conf && \
     a2ensite 000-default.conf && \
     a2enmod rewrite
 
-WORKDIR /var/www/html
+RUN docker-php-ext-install pdo pdo_pgsql
 
-RUN rm /var/www/html/*
+WORKDIR /var/www/html
 
 RUN git clone https://github.com/DNXLabs/ChallengeDevOps.git .
 
@@ -32,12 +21,14 @@ RUN chown -R www-data:www-data /var/www/html && \
     php artisan key:generate && \
     php artisan config:cache && \
     cp .env.example .env && \
-    sed -1 "s/DB_HOST=.* /DB_HOST=/" .env && \
-    sed -1 "s/DB_DATABASE=.* /DB_DATABASE=homestead/" .env && \
-    sed -1 "s/DB_USERNAME=.* /DB_USERNAME=root/" .env && \
-    sed -1 "s/DB_PASSWORD=.* /DB_PASSWORD=secret/" .env
+    sed -i "s/DB_HOST=.*/DB_HOST=mysql.ckrolti37rrx.ap-southeast-2.rds.amazonaws.com/" .env && \
+    sed -i "s/DB_DATABASE=.*/DB_DATABASE=homestead/" .env && \
+    sed -i "s/DB_USERNAME=.*/DB_USERNAME=homestead/" .env && \
+    sed -i "s/DB_PASSWORD=.*/DB_PASSWORD=secret01/" .env
+
+ADD ./docker-entrypoint.sh /bin/docker-entrypoint.sh
+RUN chmod +x /bin/docker-entrypoint.sh
+ENTRYPOINT ["/bin/docker-entrypoint.sh"]
 
 #expose port 80 for web trafic
 EXPOSE 80
-# initiate apache
-CMD ["/usr/sbin/apache2ctl", "-D", "FOREGROUND"]

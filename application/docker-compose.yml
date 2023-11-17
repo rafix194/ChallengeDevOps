@@ -5,8 +5,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    entrypoint: ["/bin/bash"]
     ports:
-      - "80:80"
+      - 80:80
     volumes:
-      - ./ChallengeDevOps:/app
-#docker run --rm -it teste:teste
+      - ./..:/work
