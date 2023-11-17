@@ -1,30 +1,43 @@
-FROM php:7.4-apache
+FROM ubuntu:22.04 as builder
 
-RUN a2enmod rewrite
+RUN apt-get update && \
+    apt-get install -y \
+        apache2 \
+        php \
+        php-cli \
+        php-mysql \
+        mysql-server \
+        composer \
+        git && \
 
-RUN apt-get update -qq \
-  && apt-get install -y git libpq-dev zip unzip \
-  && apt-get clean autoclean \
-  && apt-get autoremove -y
+# Config Apache        
+COPY laravel.conf /etc/apache2/sites-available/laravel.conf
 
-RUN docker-php-ext-install mysqli pdo pdo_mysql 
+RUN a2ensite laravel.conf && \
+    a2ensite 000-default.conf && \
+    a2enmod rewrite
 
 WORKDIR /var/www/html
-ADD . .
-ADD ./docker-files/apache-site-default.conf /etc/apache2/sites-available/000-default.conf
 
-RUN chmod -R 777 storage bootstrap/cache
+RUN rm /var/www/html/*
 
-ADD ./docker-files/docker-entrypoint.sh /bin/docker-entrypoint.sh
-RUN chmod +x /bin/docker-entrypoint.sh
+RUN git clone https://github.com/DNXLabs/ChallengeDevOps.git .
 
-ADD ./docker-files/db-migrate.sh /bin/db-migrate.sh
-RUN chmod +x /bin/db-migrate.sh
+RUN a2enmod rewrite
+#permissions and dependencies 
+RUN chown -R www-data:www-data /var/www/html && \
+    chown -R 775 /var/www/html/storage && \
+    chown -R 775 /var/www/html/bootstrap/cache && \
+    composer install --optimize-autoloader --no-dev && \
+    php artisan key:generate && \
+    php artisan config:cache && \
+    cp .env.example .env && \
+    sed -1 "s/DB_HOST=.* /DB_HOST=/" .env && \
+    sed -1 "s/DB_DATABASE=.* /DB_DATABASE=homestead/" .env && \
+    sed -1 "s/DB_USERNAME=.* /DB_USERNAME=root/" .env && \
+    sed -1 "s/DB_PASSWORD=.* /DB_PASSWORD=secret/" .env
 
-COPY --from=composer:1.9.1 /usr/bin/composer /usr/bin/composer
-
-RUN composer install
-
-ENTRYPOINT ["/bin/docker-entrypoint.sh"]
-
-CMD ["apache2-foreground"]
+#expose port 80 for web trafic
+EXPOSE 80
+# initiate apache
+CMD ["/usr/sbin/apache2ctl", "-D", "FOREGROUND"]

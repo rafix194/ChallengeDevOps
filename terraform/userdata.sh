@@ -1,3 +1,4 @@
+#!/bin/bash
 git clone https://github.com/DNXLabs/ChallengeDevOps.git
 cd ChallengeDevOps
 cp .env.example .env

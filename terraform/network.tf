@@ -8,11 +8,18 @@ resource "aws_vpc" "main" {
 
 }
 
+resource "aws_internet_gateway" "gw" {
+    vpc_id = aws_vpc.main.id
+    tags = {
+      Name = "Gateway DNX Challenge"
+    }
+}
+
 resource "aws_subnet" "public_subnet" {
     count = length(var.public_subnet_cidrs)
     vpc_id = aws_vpc.main.id
-    cidr_block = var.public_subnet_cidrs
-    availability_zone = var.azs
+    cidr_block = var.public_subnet_cidrs[count.index]
+    availability_zone = var.azs[count.index]
     tags = {
       Name = "Public Subnet"
     }
@@ -22,35 +29,60 @@ resource "aws_subnet" "public_subnet" {
 resource "aws_subnet" "private_subnet" {
     count = length(var.private_subnet_cidrs)
     vpc_id = aws_vpc.main.id
-    cidr_block = var.private_subnet_cidrs
-    availability_zone = var.azs
+    cidr_block = var.private_subnet_cidrs[count.index]
+    availability_zone = var.azs[count.index]
     tags = {
       Name = "Private Subnet"
     }
   
 }
 
-resource "aws_internet_gateway" "gw" {
-    vpc_id = aws_vpc.main
+resource "aws_route_table" "public_rt" {
+    vpc_id = aws_vpc.main.id
     tags = {
-      Name = "Gateway DNX Challenge"
+      Name = "Challenge Public Route Table"
     }
 }
 
-resource "aws_route_table" "second_rt" {
-    vpc_id = aws_vpc.main.id
-
-    route = {
-        cidr_block = "0.0.0.0/0"
-        gateway_id = aws_internet_gateway.gw.id
-    }
-    tags = {
-      Name = "2nd Route Table"
-    }
+resource "aws_route" "public" {
+  route_table_id         = aws_route_table.public_rt.id
+  destination_cidr_block = "0.0.0.0/0"
+  gateway_id             = aws_internet_gateway.gw.id
 }
 
 resource "aws_route_table_association" "public_subnet_asso" {
-    count = var.public_subnet_cidrs
-    subnet_id = aws_subnet.public_subnet.id
-    route_table_id = aws_route_table.second_rt.id
+    count = length(var.public_subnet_cidrs)
+    subnet_id = aws_subnet.public_subnet[count.index].id
+    route_table_id = aws_route_table.public_rt.id
+}
+
+resource "aws_route_table" "private_rt" {
+    vpc_id = aws_vpc.main.id
+    tags = {
+      Name = "Challenge Private Route Table"
+    }
+}
+
+resource "aws_route" "private" {
+  route_table_id         = aws_route_table.private_rt.id
+  destination_cidr_block = "0.0.0.0/0"
+  nat_gateway_id         = aws_nat_gateway.default.id
+}
+
+resource "aws_route_table_association" "private_subnet_asso" {
+    count = length(var.private_subnet_cidrs)
+    subnet_id = aws_subnet.private_subnet[count.index].id
+    route_table_id = aws_route_table.private_rt.id
+}
+
+resource "aws_eip" "nat" {
+  vpc   = true
+}
+
+resource "aws_nat_gateway" "default" {
+  depends_on = [aws_internet_gateway.gw]
+
+
+  allocation_id = aws_eip.nat.id
+  subnet_id     = aws_subnet.public_subnet[0].id
 }
