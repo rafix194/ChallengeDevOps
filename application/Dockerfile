@@ -6,7 +6,7 @@ RUN a2ensite laravel.conf && \
     a2ensite 000-default.conf && \
     a2enmod rewrite
 
-RUN docker-php-ext-install pdo pdo_pgsql
+RUN docker-php-ext-install pdo pdo_mysql
 
 WORKDIR /var/www/html
 
